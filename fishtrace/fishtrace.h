@@ -1,9 +1,9 @@
 #ifndef FISHTRACE_H__
 #define FISHTRACE_H__
 
+#include "base_typedef.h"
 #include <string.h>
 #include <iostream>
-#include "base_typedef.h"
 #include <windows.h>
 #include <cmath>
 
@@ -123,7 +123,7 @@ public:
 	static bool gen_bezier_trace2(FishTrace& trace);
 
 	static float bezier_len(Point& p0, Point& p1, Point& p2);
-	static void gen_pos(Point& p1, Point& p2);
+	static void  gen_pos(Point& p1, Point& p2);
 private:
 	static void gen_begin_pos(uint32_t& x, uint32_t& y);
 	static void gen_end_pos(uint32_t begin_x, uint32_t begin_y, uint32_t& x, uint32_t& y);
