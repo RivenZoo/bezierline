@@ -8,8 +8,8 @@
 #include <cmath>
 
 #define MAX_TRACE_POINT 5
-#define SCN_WIDTH		1024
-#define SCN_HEIGHT		738
+#define SCN_WIDTH		400
+#define SCN_HEIGHT		400
 
 enum TraceType{
 	enm_line = 1,
@@ -22,6 +22,10 @@ struct Point{
 
 	Point(){scn_x = 0; scn_y = 0;}
 	Point(float x, float y) : scn_x(x), scn_y(y){}
+
+	void pos(){
+		std::cout << "(" << scn_x << ", " << scn_y << ")" << std::endl;
+	}
 
 	Point& operator=(const Point& r){
 		this->scn_x = r.scn_x;
@@ -65,7 +69,7 @@ struct FishTrace{
 		num++;
 	}
 
-	void add_point(uint32_t x, uint32_t y){
+	void add_point(float x, float y){
 		if(num >= MAX_TRACE_POINT)return;
 		p[num].scn_x = x;
 		p[num].scn_y = y;
@@ -85,8 +89,8 @@ protected:
 	void drawline(Painter& p);
 	void drawbezier(Painter& p);
 	void gen_control_point(Point& p1, Point& p2, float t, Point& pc){
-		int32_t dx = p2.scn_x - p1.scn_x;
-		int32_t dy = p2.scn_y - p1.scn_y;
+		float dx = p2.scn_x - p1.scn_x;
+		float dy = p2.scn_y - p1.scn_y;
 
 		pc.scn_x = p1.scn_x + dx * t;
 		pc.scn_y = p1.scn_y + dy * t;
@@ -103,7 +107,7 @@ public:
 	Point	 p[MAX_TRACE_POINT];
 	uint32_t num;
 	uint8_t  trace_type;
-	uint32_t len;
+	float	 len;
 };
 
 class TraceFactory{
@@ -111,15 +115,28 @@ public:
 	TraceFactory(){}
 	virtual ~TraceFactory(){}
 
-	static void gen_line_trace(FishTrace& trace);
-	static void gen_bezier_trace(FishTrace& trace);
-	static void gen_bezier_trace2(FishTrace& trace);
+	static bool gen_line_trace(FishTrace& trace);
+	static bool gen_line_trace(Point& begin, Point& end, bool sign, FishTrace& trace);
+	static bool gen_line_trace(Point& begin, Point& end, bool sign, uint32_t d, FishTrace& trace);
+
+	static bool gen_bezier_trace(FishTrace& trace);
+	static bool gen_bezier_trace2(FishTrace& trace);
 
 	static float bezier_len(Point& p0, Point& p1, Point& p2);
-
+	static void gen_pos(Point& p1, Point& p2);
 private:
 	static void gen_begin_pos(uint32_t& x, uint32_t& y);
 	static void gen_end_pos(uint32_t begin_x, uint32_t begin_y, uint32_t& x, uint32_t& y);
+	
+	static bool gen_parallel_line(Point& begin, Point& end, bool sign/*+-*/, Point& p1, Point& p2);
+	static bool gen_parallel_line(Point& begin, Point& end, bool sign/*+-*/, uint32_t d, Point& p1, Point& p2);
+
+	static bool check_point(Point& p){
+		if(p.scn_x >= 0 && p.scn_x <= SCN_WIDTH && p.scn_y >= 0 && p.scn_y <= SCN_HEIGHT)
+			return true;
+		else
+			return false;
+	}
 };
 
 #endif

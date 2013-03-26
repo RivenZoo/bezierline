@@ -2,6 +2,9 @@
 #include <cstdlib>
 #include <assert.h>
 
+#define line_y(k, c, x) ((k*x)+c)
+#define line_x(k, c, y) ((y-c)/k)
+
 void FishTrace::draw(Painter& p){
 	if(trace_type == enm_line)
 		drawline(p);
@@ -17,7 +20,7 @@ void FishTrace::drawline(Painter& p){
 void FishTrace::drawbezier(Painter& pen){
 	Point psrc = this->p[0];
 	if(num == 3){
-		float t = 1.0 / 100;
+		double t = 1.0 / 100;
 		for(; t < 1; t += 0.01){
 			Point c1, c2, cm;
 // 			gen_control_point(this->p[0], this->p[1], t, c1);
@@ -30,19 +33,54 @@ void FishTrace::drawbezier(Painter& pen){
 	}
 }
 
-void TraceFactory::gen_line_trace(FishTrace& trace){
+bool TraceFactory::gen_line_trace(FishTrace& trace){
 	trace.trace_type = enm_line;
 
-	uint32_t x1 = 0, y1 = 0;
-	gen_begin_pos(x1, y1);
-	trace.add_point(x1, y1);
+	Point p1, p2;
+	gen_pos(p1, p2);
+	trace.add_point(p1);
+	trace.add_point(p2);
 
-	uint32_t x2 = 0, y2 = 0;
-	gen_end_pos(x1, y1, x2, y2);
-	trace.add_point(x2, y2);
-	float dx = x1 - x2;
-	float dy = y1 - y2;
+	float dx = p1.scn_x - p2.scn_x;
+	float dy = p1.scn_y - p2.scn_y;
 	trace.len = pow(dx, 2) + pow(dy, 2);
+	return true;
+}
+
+
+bool TraceFactory::gen_line_trace(Point& begin, Point& end, bool sign, FishTrace& trace){
+	trace.trace_type = enm_line;
+
+	uint32_t seed = rand();
+	float d = seed % (SCN_HEIGHT / 4);
+
+	Point p1, p2;
+	if(!gen_parallel_line(begin, end, sign, p1, p2))
+		return false;
+
+	trace.add_point(p1);
+	trace.add_point(p2);
+
+	float dx = p1.scn_x - p2.scn_x;
+	float dy = p1.scn_y - p2.scn_y;
+	trace.len = pow(dx, 2) + pow(dy, 2);
+	return true;
+}
+
+bool TraceFactory::gen_line_trace(Point& begin, Point& end, bool sign, uint32_t d, FishTrace& trace){
+	trace.trace_type = enm_line;
+
+	Point p1, p2;
+	if(!gen_parallel_line(begin, end, sign, d, p1, p2))
+		return false;
+
+	trace.add_point(p1);
+	trace.add_point(p2);
+
+	float dx = p1.scn_x - p2.scn_x;
+	float dy = p1.scn_y - p2.scn_y;
+	trace.len = pow(dx, 2) + pow(dy, 2);
+	return true;
 }
 
 void TraceFactory::gen_begin_pos(uint32_t& x, uint32_t& y){
@@ -114,69 +152,170 @@ void TraceFactory::gen_end_pos(uint32_t begin_x, uint32_t begin_y, uint32_t& x, 
 	}
 }
 
-void TraceFactory::gen_bezier_trace(FishTrace& trace){
-	trace.trace_type = enm_bezier;
+void TraceFactory::gen_pos(Point& p1, Point& p2){
+	uint32_t seed = rand();
+	float r1 = rand() % 76 / 100.0 + 0.125;
+	float r2 = rand() % 76 / 100.0 + 0.125;
 
-	uint32_t x1 = 0, y1 = 0;
-	gen_begin_pos(x1, y1);
-
-	uint32_t x2 = 0, y2 = 0;
-	gen_end_pos(x1, y1, x2, y2);
-
-	uint32_t x3 = (x1 + x2) / 2;
-	uint32_t y3 = (y1 + y2) / 2;
-
-	int32_t x = x3;
-	int32_t y = y3;
-
-	//随机左右偏移
-	(x1 % 2 == 0) ? (x += SCN_WIDTH / 2) : (x -= SCN_WIDTH / 2);
-
-	//调整到中间
-	if(x < 0) x3 += SCN_WIDTH / 2;
-	if(x > SCN_WIDTH) x3 -= SCN_WIDTH / 2;		
-
-	(y1 % 2 == 0) ? (y += SCN_HEIGHT / 2) : (y -= SCN_HEIGHT / 2);
-	if(y < 0) y3 += SCN_HEIGHT / 2;
-	if(y > SCN_HEIGHT) y3 -= SCN_HEIGHT / 2;
-
-	trace.add_point(x1, y1);
-	trace.add_point(x3, y3);
-	trace.add_point(x2, y2);
-
-	trace.len = bezier_len(Point(x1, y1), Point(x3, y3), Point(x2, y2));
+	Point cross_p[4] = {Point(0, SCN_HEIGHT * r1), Point(SCN_WIDTH * r2, 0), Point(SCN_WIDTH, SCN_HEIGHT * r1), Point(SCN_WIDTH * r2, SCN_HEIGHT)};
+	uint32_t fisrt_index = seed % 4;
+	p1 = cross_p[fisrt_index];
+	if(fisrt_index != 3){
+		cross_p[fisrt_index] = cross_p[3];
+	}
+	uint32_t second_index = seed % 3;
+	p2 = cross_p[second_index];
 }
 
-void TraceFactory::gen_bezier_trace2(FishTrace& trace){
+bool TraceFactory::gen_parallel_line(Point& begin, Point& end, bool sign/*+-*/, Point& p1, Point& p2){
+	uint32_t seed = rand();
+	uint32_t d = seed % (SCN_HEIGHT / 4);
+
+	gen_parallel_line(begin, end, sign, d, p1, p2);
+	return true;
+}
+
+bool TraceFactory::gen_parallel_line(Point& begin, Point& end, bool sign, uint32_t d, Point& p1, Point& p2){
+	if(begin.scn_x == end.scn_x){
+		p1.scn_x = begin.scn_x;
+		if(sign)
+			p1.scn_x += d;
+		else
+			p1.scn_x -= d;
+		if(p1.scn_x < SCN_WIDTH * 0.125) 
+			return false;
+		else if(p1.scn_x > SCN_WIDTH * 0.875)
+			return false;
+		p2.scn_x = p1.scn_x;
+		p1.scn_y = begin.scn_y;
+		p2.scn_y = end.scn_y;
+	}else if(begin.scn_y == end.scn_y){
+		p1.scn_y = begin.scn_y;
+		if(sign)
+			p1.scn_y += d;
+		else
+			p1.scn_y -= d;
+		if(p1.scn_y < SCN_HEIGHT * 0.125) 
+			return false;
+		else if(p1.scn_y > SCN_HEIGHT * 0.875)
+			return false;
+		p2.scn_y = p1.scn_y;
+		p1.scn_x = begin.scn_x;
+		p2.scn_x = end.scn_x;
+	}else{
+		double k = (begin.scn_y - end.scn_y) / (begin.scn_x - end.scn_x);
+		double c = (begin.scn_x * end.scn_y - end.scn_x * begin.scn_y) / (begin.scn_x - end.scn_x);
+
+		if(sign)
+			c += d;
+		else
+			c -= d;
+
+		Point cross_p[4] = {Point(0, line_y(k, c, 0)), Point(line_x(k, c, 0), 0), Point(SCN_WIDTH, line_y(k, c, SCN_WIDTH)), Point(line_x(k, c, SCN_HEIGHT), SCN_HEIGHT)};
+		uint32_t counter = 0;
+		for(uint32_t i = 0; i < 4; i++){
+			if(check_point(cross_p[i])){
+				if(counter == 0)
+					p1 = cross_p[i];
+				else
+					p2 = cross_p[i];
+				counter++;
+				if(counter >= 2) break;
+			}
+		}
+
+		if(counter < 2)
+			return false;
+
+		if(p1.scn_x < SCN_WIDTH * 0.125 && p2.scn_x < SCN_WIDTH * 0.125)
+			return false;
+		if(p1.scn_y < SCN_HEIGHT * 0.125 && p2.scn_y < SCN_HEIGHT * 0.125)
+			return false;
+		if(p1.scn_x > SCN_WIDTH * 0.875 && p2.scn_x > SCN_WIDTH * 0.875)
+			return false;
+		if(p1.scn_y > SCN_HEIGHT * 0.875 && p2.scn_y > SCN_HEIGHT * 0.875)
+			return false;
+	}
+	return true;
+}
+
+bool TraceFactory::gen_bezier_trace(FishTrace& trace){
 	trace.trace_type = enm_bezier;
 
-	uint32_t x1 = 0, y1 = 0;
-	gen_begin_pos(x1, y1);
+	Point p1, p2;
+	gen_pos(p1, p2);
 
-	uint32_t x2 = 0, y2 = 0;
-	gen_end_pos(x1, y1, x2, y2);
+	float x3 = (p1.scn_x + p2.scn_x) / 2.0;
+	float y3 = (p1.scn_y + p2.scn_y) / 2.0;
 
-	uint32_t x3 = (x1 + x2) / 2;
-	uint32_t y3 = (y1 + y2) / 2;
-
-	int32_t x = x3;
-	int32_t y = y3;
+	float x = x3;
+	float y = y3;
 
 	//随机左右偏移
-	(x1 % 2 == 0) ? (x += SCN_WIDTH / 2) : (x -= SCN_WIDTH / 2);
+	((int32_t)p1.scn_x % 2 == 0) ? (x += SCN_WIDTH / 2) : (x -= SCN_WIDTH / 2);
 
 	//调整到中间
 	if(x < 0) x3 += SCN_WIDTH / 2;
 	if(x > SCN_WIDTH) x3 -= SCN_WIDTH / 2;		
 
-	(y1 % 2 == 0) ? (y += SCN_HEIGHT / 2) : (y -= SCN_HEIGHT / 2);
+	((int32_t)p1.scn_y % 2 == 0) ? (y += SCN_HEIGHT / 2) : (y -= SCN_HEIGHT / 2);
 	if(y < 0) y3 += SCN_HEIGHT / 2;
 	if(y > SCN_HEIGHT) y3 -= SCN_HEIGHT / 2;
 
-	trace.add_point(x1, y1);
+	trace.add_point(p1);
 	trace.add_point(x3, y3);
-	trace.add_point(x2, y2);
-	trace.len = bezier_len(Point(x1, y1), Point(x3, y3), Point(x2, y2));
+	trace.add_point(p2);
+
+	trace.len = bezier_len(p1, Point(x3, y3), p2);
+	return true;
+}
+
+bool TraceFactory::gen_bezier_trace2(FishTrace& trace){
+	trace.trace_type = enm_bezier;
+
+	Point p1, p2;
+	gen_pos(p1, p2);
+
+	float pecent = rand() % 4 / 10.0 + 0.3;
+
+	float x3 = (p1.scn_x + p2.scn_x) * pecent;
+	float y3 = (p1.scn_y + p2.scn_y) * pecent;
+	
+	bool direct = true;
+	if((p1.scn_x - p2.scn_x) > (0 - SCN_WIDTH / 4.0) && (p1.scn_x - p2.scn_x) < SCN_WIDTH / 4.0){
+		direct = true;
+	} else if((p1.scn_y - p2.scn_y) > (0 - SCN_HEIGHT / 4.0) && (p1.scn_y - p2.scn_y) < SCN_HEIGHT / 4.0){
+		direct = false;
+	}
+	else if((int32_t)p2.scn_x % 2 == 0){
+		direct = true;
+	}else{
+		direct = false;
+	}
+
+	if(direct){
+		//随机左右偏移
+		((int32_t)p1.scn_x % 2 == 0) ? (x3 += SCN_WIDTH / 2) : (x3 -= SCN_WIDTH / 2);
+		
+		//调整到中间
+		if(x3 < 0) 
+			x3 += SCN_WIDTH;
+		else if(x3 > SCN_WIDTH) 
+			x3 -= SCN_WIDTH;
+	}else{
+		((int32_t)p1.scn_y % 2 == 0) ? (y3 += SCN_HEIGHT / 2) : (y3 -= SCN_HEIGHT / 2);
+
+		if(y3 < 0) 
+			y3 += SCN_HEIGHT;
+		else if(y3 > SCN_HEIGHT) 
+			y3 -= SCN_HEIGHT;
+	}
+	
+	trace.add_point(p1);
+	trace.add_point(x3, y3);
+	trace.add_point(p2);
+	trace.len = bezier_len(p1, Point(x3, y3), p2);
+	return true;
 }
 
 float TraceFactory::bezier_len(Point& p0, Point& p1, Point& p2){
